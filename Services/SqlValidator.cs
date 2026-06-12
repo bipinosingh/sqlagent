@@ -4,10 +4,17 @@
     {
         public bool IsSafe(string sql)
         {
-            var upperSql = sql.ToUpper();
+            if (String.IsNullOrWhiteSpace(sql)) {
+                return false;
+            }
+
+            var upperSql = sql.Trim().ToUpper();
 
             // Must start with SELECT
             if (!upperSql.StartsWith("SELECT"))
+                return false;
+
+            if (!upperSql.Contains(";"))
                 return false;
 
             // Block dangerous keywords

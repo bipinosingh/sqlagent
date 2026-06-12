@@ -1,6 +1,8 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using SqlAgent.Models;
 using SqlAgent.Services;
+using SqlAgent.DTOs;
+using System.Diagnostics;
 
 namespace SqlAgent.Controllers;
 
@@ -11,78 +13,93 @@ public class QueryController : ControllerBase
     private readonly SqlExecutorService _sqlExecutor;
     private readonly AIService _aiService;
     private readonly SqlValidator _validator;
+    private readonly QueryResponse _queryResponse;
+    private readonly ILogger<QueryController> _logger;
 
-    public QueryController(SqlExecutorService sqlExecutor, AIService aiService, SqlValidator validator)
+    public QueryController(SqlExecutorService sqlExecutor, AIService aiService, SqlValidator validator, QueryResponse queryResponse, ILogger<QueryController> logger)
     {
         _sqlExecutor = sqlExecutor;
         _aiService = aiService;
         _validator = validator;
+        _queryResponse = queryResponse;
+        _logger = logger;
     }
 
     [HttpPost("ask")]
     public async Task<IActionResult> Ask([FromBody] QueryRequest request)
     {
-        string sql;
-        int retries = 0;
-        /*
-        // Temporary hardcoded SQL
-        var sql = "SELECT * FROM Customers";
-
-        var data = await _sqlExecutor.ExecuteQueryAsync(sql);
-
-        return Ok(new
-        {
-            sql,
-            data
-        });
-        */
+        var totalTimer = Stopwatch.StartNew();
 
         try
         {
-            sql = await _aiService.GenerateSqlAsync(request.Question);
+            _logger.LogInformation("Received question: {Question}", request.Question);
 
-            do
-            {
-                if (!_validator.IsSafe(sql))
-                {
-                    return BadRequest(new
-                    {
-                        error = "Unsafe SQL detected",
-                        generatedSql = sql
-                    });
-                }
-                else
-                {
-                    break;
-                }
-                retries++;
-            } while (retries < 2);
+            var sqlTimer = Stopwatch.StartNew();
+            var sql = await _aiService.GenerateSqlAsync(request.Question);
+            sqlTimer.Stop();
 
-            var data = await _sqlExecutor.ExecuteQueryAsync(sql);
-            var explanation = await _aiService.ExplainDataAsync(request.Question, sql, data);
+            _logger.LogInformation("Generated SQL: {Sql}", sql);
 
             if (!_validator.IsSafe(sql))
             {
-                return BadRequest("Failed to generate safe SQL.");
-            }
-            else
-            {
-                return Ok(new
+                _logger.LogWarning("Unsafe SQL detected: {Sql}", sql);
+                return BadRequest(new QueryResponse
                 {
-                    success = true,
-                    question = request.Question,
-                    sqlQuery = sql,
-                    resultCount = data.Count(),
-                    data,
-                    explanation
+                    Success = false,
+                    Question = request.Question,
+                    SqlQuery = sql,
+                    Error = "Unsafe SQL detected"
                 });
             }
+
+            var dbTimer = Stopwatch.StartNew();
+            var data = await _sqlExecutor.ExecuteQueryAsync(sql);
+            dbTimer.Stop();
+
+            var explainTimer = Stopwatch.StartNew();
+            var explanation = await _aiService.ExplainDataAsync(request.Question, sql, data);
+            explainTimer.Stop();
+
+            
+
+            totalTimer.Stop();
+
+            _logger.LogInformation("Query executed successfully. Rows returned: {Count} | Performance Metrics | SQL Generation: {SqlMs} ms | DB Execution: {DbMs} ms | Explanation: {ExplainMs} ms | Total: {TotalMs} ms", data.Count(), sqlTimer.ElapsedMilliseconds,
+                                    dbTimer.ElapsedMilliseconds,
+                                    explainTimer.ElapsedMilliseconds,
+                                    totalTimer.ElapsedMilliseconds);
+
+            var response = new QueryResponse
+            {
+                Success = true,
+                Question = request.Question,
+                SqlQuery = sql,
+                ResultCount = data.Count(),
+                
+
+                SqlGenerationTimeMs = sqlTimer.ElapsedMilliseconds,
+
+                DatabaseExecutionTimeMs = dbTimer.ElapsedMilliseconds,
+
+                ExplanationTimeMs = explainTimer.ElapsedMilliseconds,
+
+                TotalExecutionTimeMs = totalTimer.ElapsedMilliseconds,
+
+                Data = data,
+                Explanation = explanation
+
+            };
+
+            return Ok(response);
         }
         catch (Exception ex)
         {
-            return StatusCode(500, new
+            _logger.LogError(ex, "Error occurred while processing question");
+
+            return StatusCode(500, new QueryResponse
             {
-                error = ex.Message
+                Success = false,
+                Error = ex.Message
             });
         }
 
