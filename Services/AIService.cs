@@ -8,15 +8,18 @@ namespace SqlAgent.Services
     {
 
         private readonly OpenAI.Chat.ChatClient _chatClient;
+        private readonly SchemaService _schemaService;
 
-        public AIService(IConfiguration config)
+        public AIService(IConfiguration config, SchemaService schemaService)
         {
             var apiKey = config["OpenAI:ApiKey"];
             _chatClient = new OpenAI.Chat.ChatClient(model: "gpt-4.1-mini", apiKey: apiKey);
+            _schemaService = schemaService;
         }
 
         public async Task<string> GenerateSqlAsync(string question)
         {
+            var schema = await _schemaService.GetSchemaAsync();
             //var prompt = $@"You are a SQL Server expert.
 
             //                Database schema:
@@ -32,19 +35,16 @@ namespace SqlAgent.Services
 
             //                Question: {{question}}";
 
-
             var prompt = $@"You are a SQL Server expert.
 
                             Database schema:
-                            Customers(Id, Name, Country)
-                            Orders(Id, CustomerId, Amount, OrderDate)
+                            {schema}
 
                             Instructions:
                             - Only use tables that are explicitly required by the question
                             - DO NOT join tables unless the question clearly requires it
-                            - If the question is only about Customers, use ONLY Customers table
-                            - If the question is only about Orders, use ONLY Orders table
-                            - Use JOIN only when necessary (e.g., customer + order data together)
+                            - If the question is only about one table, use ONLY that table
+                            - Use JOIN only when necessary
                             - Return ONLY SQL query (no explanation)
 
                             Question: {question}";

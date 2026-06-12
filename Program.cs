@@ -1,5 +1,6 @@
 
 using SqlAgent.Data;
+using SqlAgent.DTOs;
 using SqlAgent.Services;
 
 namespace SqlAgent
@@ -18,6 +19,7 @@ namespace SqlAgent
             builder.Services.AddScoped<AIService>();
             builder.Services.AddScoped<SqlExecutorService>();
             builder.Services.AddScoped<SchemaService>();
+            builder.Services.AddScoped<QueryResponse>();
             // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
             builder.Services.AddEndpointsApiExplorer();
             builder.Services.AddSwaggerGen();
