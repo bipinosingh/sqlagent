@@ -2,6 +2,7 @@
 using SqlAgent.Data;
 using SqlAgent.DTOs;
 using SqlAgent.Services;
+using StackExchange.Redis;
 
 namespace SqlAgent
 {
@@ -15,11 +16,30 @@ namespace SqlAgent
 
             builder.Services.AddControllers();
             builder.Services.AddSingleton<DbConnectionFactory>();
+            builder.Services.AddSingleton<IConnectionMultiplexer>(
+            sp =>
+            {
+                var configuration = builder.Configuration;
+                /*                
+                var connectionString =
+                    configuration["Redis:ConnectionString"];
+                return ConnectionMultiplexer.Connect(connectionString);
+                */
+
+                var options = ConfigurationOptions.Parse(configuration["Redis:ConnectionString"]);
+
+                options.AbortOnConnectFail = false;
+
+                return ConnectionMultiplexer.Connect(options);
+
+            });
             builder.Services.AddSingleton<SqlValidator>();
             builder.Services.AddScoped<AIService>();
             builder.Services.AddScoped<SqlExecutorService>();
             builder.Services.AddScoped<SchemaService>();
             builder.Services.AddScoped<QueryResponse>();
+            builder.Services.AddScoped<RedisCacheService>();
+            builder.Services.AddScoped<AgentService>();
             // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
             builder.Services.AddEndpointsApiExplorer();
             builder.Services.AddSwaggerGen();
