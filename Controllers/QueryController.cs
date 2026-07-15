@@ -32,25 +32,13 @@ public class QueryController : ControllerBase
             });
         }
 
-        try
-        {
-            var response = await _agentService.ProcessAsync(request.Question);
+        var response = await _agentService.ProcessAsync(request.Question);
 
-            if (response.Success)
-                return Ok(response);
+        if (response.Success)
+            return Ok(response);
 
-            return BadRequest(response);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Unhandled exception.");
+        return BadRequest(response);
 
-            return StatusCode(500, new QueryResponse
-            {
-                Success = false,
-                Error = ex.Message
-            });
-        }
     }
 
     [HttpPost("explain-sql")]
@@ -65,8 +53,13 @@ public class QueryController : ControllerBase
 
         return Ok(new
         {
-            sql,
-            explanation
+            Success = true,
+            Message = "SQL explanation generated successfully.",
+            Data = new
+            {
+                Sql = sql,
+                Explanation = explanation
+            }
         });
     }
 }

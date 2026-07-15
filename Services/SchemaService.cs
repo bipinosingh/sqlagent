@@ -40,13 +40,12 @@ public class SchemaService
         // ----------------------------
         try
         {
+            _logger.LogInformation("Checking schema in Redis cache for {0}", cacheKey);
             var cachedSchema = await _cache.GetAsync(cacheKey);
 
             if (!string.IsNullOrWhiteSpace(cachedSchema))
             {
-                _logger.LogInformation(
-                    "Database schema loaded from Redis cache.");
-
+                _logger.LogInformation("Database schema loaded from Redis cache key {0}", cacheKey);
                 return cachedSchema;
             }
 
