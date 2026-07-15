@@ -1,6 +1,7 @@
 
 using SqlAgent.Data;
 using SqlAgent.DTOs;
+using SqlAgent.Middleware;
 using SqlAgent.Services;
 using StackExchange.Redis;
 
@@ -54,10 +55,8 @@ namespace SqlAgent
             }
 
             app.UseHttpsRedirection();
-
-            app.UseAuthorization();
-
-
+            app.UseMiddleware<ExceptionMiddleware>();
+            app.UseAuthorization();            
             app.MapControllers();
 
             app.Run();

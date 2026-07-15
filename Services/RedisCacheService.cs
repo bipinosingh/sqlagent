@@ -4,18 +4,32 @@ namespace SqlAgent.Services
 {
     public class RedisCacheService
     {
-
-        private readonly IDatabase _database;
+        private readonly ILogger<RedisCacheService> _logger;
+        private readonly IConnectionMultiplexer redisConnectionMultiplexer;
 
         public RedisCacheService(
-            IConnectionMultiplexer redis)
+            IConnectionMultiplexer _redisConnectionMultiplexer, ILogger<RedisCacheService> logger)
         {
-            _database = redis.GetDatabase();
+            //_database = redis.GetDatabase();
+            _logger = logger;
+            _redisConnectionMultiplexer = redisConnectionMultiplexer;
         }
 
         public async Task<string?> GetAsync(string key)
         {
-            return await _database.StringGetAsync(key);
+            try
+            {
+                var db = redisConnectionMultiplexer.GetDatabase();
+                return await db.StringGetAsync(key);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex,
+                    "Redis GET failed for key {Key}. Falling back to SQL Server.",
+                    key);
+
+                return null;
+            }
         }
 
         public async Task SetAsync(
@@ -23,10 +37,21 @@ namespace SqlAgent.Services
             string value,
             TimeSpan expiry)
         {
-            await _database.StringSetAsync(
-                key,
-                value,
-                expiry);
+            try
+            {
+                var db = redisConnectionMultiplexer.GetDatabase();
+
+                await db.StringSetAsync(
+                    key,
+                    value,
+                    expiry);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex,
+                    "Redis SET failed for key {Key}. Cache not updated.",
+                    key);
+            }
         }
 
     }

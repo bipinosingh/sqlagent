@@ -24,5 +24,9 @@
 
         public long TotalExecutionTimeMs { get; set; }
 
+        public DateTime Timestamp { get; set; } = DateTime.UtcNow;
+
+        public Guid RequestId { get; set; } = Guid.NewGuid();
+
     }
 }
